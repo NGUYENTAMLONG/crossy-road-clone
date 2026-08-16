@@ -4,7 +4,7 @@ const hintDOM = document.getElementById("hint");
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x8fd4ea);
-scene.fog = new THREE.Fog(0x8fd4ea, 420, 1400);
+scene.fog = new THREE.Fog(0x8fd4ea, 900, 2400);
 
 const distance = 500;
 const camera = new THREE.OrthographicCamera(
@@ -56,6 +56,9 @@ let stepStartTimestamp;
 let gameOver = false;
 let targetRotationZ = 0;
 let hintHidden = false;
+let score = 0;
+let invincibleUntil = 0;
+let lastHitFlash = false;
 
 const carFrontTexture = new Texture(40, 80, [{ x: 0, y: 10, w: 30, h: 60 }]);
 const carBackTexture = new Texture(40, 80, [{ x: 10, y: 10, w: 30, h: 60 }]);
@@ -127,10 +130,30 @@ backLight.position.set(200, 200, 50);
 backLight.castShadow = true;
 scene.add(backLight);
 
-const laneTypes = ["car", "truck", "forest"];
+const laneTypes = ["car", "truck", "forest", "motorbike", "bicycle"];
 const laneSpeeds = [2, 2.5, 3];
+const lightLaneSpeeds = {
+  motorbike: [3.6, 4.2, 4.8],
+  bicycle: [1.2, 1.6, 2],
+};
+const movingLaneTypes = ["car", "truck", "motorbike", "bicycle"];
+const lethalLaneTypes = ["car", "truck"];
+const penaltyLaneTypes = ["motorbike", "bicycle"];
+const vehicleLengths = {
+  car: 60,
+  truck: 105,
+  motorbike: 34,
+  bicycle: 30,
+};
+const penaltyValues = {
+  motorbike: 2,
+  bicycle: 1,
+};
 const vechicleColors = [0xa52523, 0xbdb638, 0x78b14b];
 const threeHeights = [20, 45, 60];
+const hitFlashDOM = document.getElementById("hit-flash");
+const scorePopDOM = document.getElementById("score-pop");
+const scoreBoxDOM = document.getElementById("score-box");
 
 const initaliseValues = () => {
   lanes = generateLanes();
@@ -145,6 +168,13 @@ const initaliseValues = () => {
   stepStartTimestamp = null;
   gameOver = false;
   targetRotationZ = 0;
+  score = 0;
+  invincibleUntil = 0;
+  lastHitFlash = false;
+  document.body.classList.remove("chicken-hit");
+  if (scoreBoxDOM) scoreBoxDOM.classList.remove("penalty");
+  if (hitFlashDOM) hitFlashDOM.classList.remove("active");
+  setChickenOpacity(1);
 
   chicken.position.x = 0;
   chicken.position.y = 0;
@@ -173,9 +203,9 @@ document.body.appendChild(renderer.domElement);
 
 function getCameraZoom() {
   const shortSide = Math.min(window.innerWidth, window.innerHeight);
-  if (shortSide < 400) return 1.55;
-  if (shortSide < 600) return 1.3;
-  if (shortSide < 800) return 1.1;
+  if (shortSide < 400) return 0.52;
+  if (shortSide < 600) return 0.64;
+  if (shortSide < 800) return 0.82;
   return 1;
 }
 
@@ -343,6 +373,128 @@ function Truck() {
   truck.add(backWheel);
 
   return truck;
+}
+
+function SmallWheel() {
+  const wheel = new THREE.Mesh(
+    new THREE.BoxBufferGeometry(8 * zoom, 4 * zoom, 8 * zoom),
+    new THREE.MeshLambertMaterial({ color: 0x222222, flatShading: true })
+  );
+  wheel.position.z = 4 * zoom;
+  return wheel;
+}
+
+function Motorbike() {
+  const bike = new THREE.Group();
+  const colors = [0xff3b30, 0x1c1c1c, 0xffcc00, 0x2f80ed];
+  const color = colors[Math.floor(Math.random() * colors.length)];
+
+  const frontWheel = SmallWheel();
+  frontWheel.position.x = 12 * zoom;
+  bike.add(frontWheel);
+
+  const backWheel = SmallWheel();
+  backWheel.position.x = -12 * zoom;
+  bike.add(backWheel);
+
+  const body = new THREE.Mesh(
+    new THREE.BoxBufferGeometry(22 * zoom, 8 * zoom, 6 * zoom),
+    new THREE.MeshPhongMaterial({ color, flatShading: true })
+  );
+  body.position.z = 9 * zoom;
+  body.castShadow = true;
+  bike.add(body);
+
+  const tank = new THREE.Mesh(
+    new THREE.BoxBufferGeometry(10 * zoom, 7 * zoom, 5 * zoom),
+    new THREE.MeshPhongMaterial({ color, flatShading: true })
+  );
+  tank.position.set(4 * zoom, 0, 13 * zoom);
+  bike.add(tank);
+
+  const seat = new THREE.Mesh(
+    new THREE.BoxBufferGeometry(8 * zoom, 7 * zoom, 3 * zoom),
+    new THREE.MeshLambertMaterial({ color: 0x333333, flatShading: true })
+  );
+  seat.position.set(-6 * zoom, 0, 12 * zoom);
+  bike.add(seat);
+
+  const handle = new THREE.Mesh(
+    new THREE.BoxBufferGeometry(2 * zoom, 14 * zoom, 2 * zoom),
+    new THREE.MeshLambertMaterial({ color: 0x111111, flatShading: true })
+  );
+  handle.position.set(10 * zoom, 0, 15 * zoom);
+  bike.add(handle);
+
+  const rider = new THREE.Mesh(
+    new THREE.BoxBufferGeometry(7 * zoom, 7 * zoom, 8 * zoom),
+    new THREE.MeshPhongMaterial({ color: 0x2c3e50, flatShading: true })
+  );
+  rider.position.set(-3 * zoom, 0, 18 * zoom);
+  rider.castShadow = true;
+  bike.add(rider);
+
+  const helmet = new THREE.Mesh(
+    new THREE.BoxBufferGeometry(6 * zoom, 6 * zoom, 5 * zoom),
+    new THREE.MeshPhongMaterial({ color: 0xf1c40f, flatShading: true })
+  );
+  helmet.position.set(-2 * zoom, 0, 24 * zoom);
+  bike.add(helmet);
+
+  return bike;
+}
+
+function Bicycle() {
+  const bike = new THREE.Group();
+  const colors = [0xe74c3c, 0x27ae60, 0x3498db, 0xf39c12];
+  const color = colors[Math.floor(Math.random() * colors.length)];
+
+  const frontWheel = SmallWheel();
+  frontWheel.position.x = 11 * zoom;
+  bike.add(frontWheel);
+
+  const backWheel = SmallWheel();
+  backWheel.position.x = -11 * zoom;
+  bike.add(backWheel);
+
+  const frame = new THREE.Mesh(
+    new THREE.BoxBufferGeometry(18 * zoom, 3 * zoom, 3 * zoom),
+    new THREE.MeshPhongMaterial({ color, flatShading: true })
+  );
+  frame.position.z = 10 * zoom;
+  frame.castShadow = true;
+  bike.add(frame);
+
+  const bar = new THREE.Mesh(
+    new THREE.BoxBufferGeometry(2 * zoom, 12 * zoom, 2 * zoom),
+    new THREE.MeshLambertMaterial({ color, flatShading: true })
+  );
+  bar.position.set(9 * zoom, 0, 14 * zoom);
+  bike.add(bar);
+
+  const seat = new THREE.Mesh(
+    new THREE.BoxBufferGeometry(5 * zoom, 4 * zoom, 2 * zoom),
+    new THREE.MeshLambertMaterial({ color: 0x4a3728, flatShading: true })
+  );
+  seat.position.set(-6 * zoom, 0, 14 * zoom);
+  bike.add(seat);
+
+  const rider = new THREE.Mesh(
+    new THREE.BoxBufferGeometry(6 * zoom, 6 * zoom, 9 * zoom),
+    new THREE.MeshPhongMaterial({ color: 0x8e44ad, flatShading: true })
+  );
+  rider.position.set(-4 * zoom, 0, 20 * zoom);
+  rider.castShadow = true;
+  bike.add(rider);
+
+  const head = new THREE.Mesh(
+    new THREE.BoxBufferGeometry(5 * zoom, 5 * zoom, 5 * zoom),
+    new THREE.MeshPhongMaterial({ color: 0xffdbac, flatShading: true })
+  );
+  head.position.set(-3 * zoom, 0, 27 * zoom);
+  bike.add(head);
+
+  return bike;
 }
 
 function Three() {
@@ -711,6 +863,101 @@ function Lane(index) {
       this.speed = laneSpeeds[Math.floor(Math.random() * laneSpeeds.length)];
       break;
     }
+    case "motorbike": {
+      this.mesh = new Road();
+      this.direction = Math.random() >= 0.5;
+
+      const occupiedPositions = new Set();
+      this.vechicles = [1, 2, 3, 4].map(() => {
+        const vechicle = new Motorbike();
+        let position;
+        do {
+          position = Math.floor((Math.random() * columns) / 2);
+        } while (occupiedPositions.has(position));
+        occupiedPositions.add(position);
+        vechicle.position.x =
+          (position * positionWidth * 2 + positionWidth / 2) * zoom -
+          (boardWidth * zoom) / 2;
+        if (!this.direction) vechicle.rotation.z = Math.PI;
+        this.mesh.add(vechicle);
+        return vechicle;
+      });
+
+      this.speed =
+        lightLaneSpeeds.motorbike[
+          Math.floor(Math.random() * lightLaneSpeeds.motorbike.length)
+        ];
+      break;
+    }
+    case "bicycle": {
+      this.mesh = new Road();
+      this.direction = Math.random() >= 0.5;
+
+      const occupiedPositions = new Set();
+      this.vechicles = [1, 2, 3].map(() => {
+        const vechicle = new Bicycle();
+        let position;
+        do {
+          position = Math.floor((Math.random() * columns) / 2);
+        } while (occupiedPositions.has(position));
+        occupiedPositions.add(position);
+        vechicle.position.x =
+          (position * positionWidth * 2 + positionWidth / 2) * zoom -
+          (boardWidth * zoom) / 2;
+        if (!this.direction) vechicle.rotation.z = Math.PI;
+        this.mesh.add(vechicle);
+        return vechicle;
+      });
+
+      this.speed =
+        lightLaneSpeeds.bicycle[
+          Math.floor(Math.random() * lightLaneSpeeds.bicycle.length)
+        ];
+      break;
+    }
+  }
+}
+
+function setScore(value) {
+  score = Math.max(0, value);
+  counterDOM.innerHTML = score;
+}
+
+function setChickenOpacity(opacity) {
+  chicken.traverse((obj) => {
+    if (!obj.material) return;
+    const materials = Array.isArray(obj.material) ? obj.material : [obj.material];
+    materials.forEach((material) => {
+      material.transparent = true;
+      material.opacity = opacity;
+      material.needsUpdate = true;
+    });
+  });
+}
+
+function showScorePop(amount) {
+  if (!scorePopDOM) return;
+  scorePopDOM.textContent = `-${amount}`;
+  scorePopDOM.classList.remove("show");
+  void scorePopDOM.offsetWidth;
+  scorePopDOM.classList.add("show");
+}
+
+function applySoftHit(laneType, timestamp) {
+  const amount = penaltyValues[laneType] || 1;
+  setScore(score - amount);
+  invincibleUntil = timestamp + 1200;
+  showScorePop(amount);
+  document.body.classList.add("chicken-hit");
+  if (scoreBoxDOM) {
+    scoreBoxDOM.classList.remove("penalty");
+    void scoreBoxDOM.offsetWidth;
+    scoreBoxDOM.classList.add("penalty");
+  }
+  if (hitFlashDOM) {
+    hitFlashDOM.classList.remove("active");
+    void hitFlashDOM.offsetWidth;
+    hitFlashDOM.classList.add("active");
   }
 }
 
@@ -872,7 +1119,7 @@ function animate(timestamp) {
 
   // Animate cars and trucks moving on the lane
   lanes.forEach((lane, laneIndex) => {
-    if (lane.type === "car" || lane.type === "truck") {
+    if (movingLaneTypes.includes(lane.type)) {
       const aBitBeforeTheBeginingOfLane =
         (-boardWidth * zoom) / 2 - positionWidth * 2 * zoom;
       const aBitAfterTheEndOFLane =
@@ -968,12 +1215,12 @@ function animate(timestamp) {
       switch (moves[0]) {
         case "forward": {
           currentLane++;
-          counterDOM.innerHTML = currentLane;
+          setScore(score + 1);
           break;
         }
         case "backward": {
           currentLane--;
-          counterDOM.innerHTML = currentLane;
+          setScore(score - 1);
           break;
         }
         case "left": {
@@ -991,20 +1238,38 @@ function animate(timestamp) {
     }
   }
 
+  const isInvincible = timestamp < invincibleUntil;
+  if (isInvincible) {
+    const visible = Math.floor(timestamp / 90) % 2 === 0;
+    setChickenOpacity(visible ? 1 : 0.22);
+    document.body.classList.toggle("chicken-hit", !visible);
+    lastHitFlash = !visible;
+  } else if (lastHitFlash || document.body.classList.contains("chicken-hit")) {
+    setChickenOpacity(1);
+    document.body.classList.remove("chicken-hit");
+    lastHitFlash = false;
+  }
+
   // Hit test
-  if (
-    !gameOver &&
-    (lanes[currentLane].type === "car" || lanes[currentLane].type === "truck")
-  ) {
+  if (!gameOver && movingLaneTypes.includes(lanes[currentLane].type)) {
     const chickenMinX = chicken.position.x - (chickenSize * zoom) / 2;
     const chickenMaxX = chicken.position.x + (chickenSize * zoom) / 2;
-    const vechicleLength = { car: 60, truck: 105 }[lanes[currentLane].type];
+    const vechicleLength = vehicleLengths[lanes[currentLane].type];
     lanes[currentLane].vechicles.forEach((vechicle) => {
       const carMinX = vechicle.position.x - (vechicleLength * zoom) / 2;
       const carMaxX = vechicle.position.x + (vechicleLength * zoom) / 2;
       if (chickenMaxX > carMinX && chickenMinX < carMaxX) {
-        gameOver = true;
-        endDOM.style.visibility = "visible";
+        if (lethalLaneTypes.includes(lanes[currentLane].type)) {
+          gameOver = true;
+          setChickenOpacity(1);
+          document.body.classList.remove("chicken-hit");
+          endDOM.style.visibility = "visible";
+        } else if (
+          penaltyLaneTypes.includes(lanes[currentLane].type) &&
+          !isInvincible
+        ) {
+          applySoftHit(lanes[currentLane].type, timestamp);
+        }
       }
     });
   }

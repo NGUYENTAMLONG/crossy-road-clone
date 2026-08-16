@@ -58,6 +58,8 @@ button:active {
 }
 
 #score-box {
+  position: relative;
+  overflow: visible;
   min-width: 88px;
   padding: 10px 14px;
   text-align: right;
@@ -78,6 +80,92 @@ button:active {
 #counter {
   font-size: 1em;
   line-height: 1;
+}
+
+#score-box.penalty {
+  border-color: #ff3b30;
+  background: rgba(180, 20, 20, 0.55);
+  animation: score-shake 0.35s ease;
+}
+
+#score-pop {
+  position: absolute;
+  right: 8px;
+  top: 100%;
+  margin-top: 6px;
+  color: #ff3b30;
+  font-size: 0.7em;
+  opacity: 0;
+  pointer-events: none;
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.45);
+}
+
+#score-pop.show {
+  animation: score-pop 700ms ease-out forwards;
+}
+
+#hit-flash {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at 50% 55%,
+    rgba(255, 80, 80, 0) 35%,
+    rgba(255, 40, 40, 0.28) 100%
+  );
+  opacity: 0;
+}
+
+#hit-flash.active {
+  animation: hit-flash 0.45s ease-out;
+}
+
+body.chicken-hit canvas {
+  filter: saturate(1.15) contrast(1.05);
+}
+
+@keyframes score-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-4px);
+  }
+  40% {
+    transform: translateX(4px);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+  80% {
+    transform: translateX(3px);
+  }
+}
+
+@keyframes score-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(4px) scale(0.8);
+  }
+  20% {
+    opacity: 1;
+    transform: translateY(0) scale(1.1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-18px) scale(1);
+  }
+}
+
+@keyframes hit-flash {
+  0% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 
 #hint {
